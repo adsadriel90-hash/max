@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ativar MaxPlayer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --noite: #0A0A0A;
+    --tela: #161616;
+    --borda: #2E2E2E;
+    --ambar: #FFC700;
+    --texto: #FFFFFF;
+    --suave: #B8B8B8;
+    --erro: #FF8A8A;
+    --ok: #FFC700;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(120% 70% at 50% 0%, #2A2300 0%, var(--noite) 55%) fixed, var(--noite);
+    color: var(--texto);
+    font: 400 1rem/1.55 "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: grid; place-items: center;
+    padding: 1.5rem 1rem;
+  }
+  main { width: 100%; max-width: 26rem; }
+
+  .logo { display: block; height: 44px; width: auto; margin: 0 0 1.5rem; }
+  .logo-texto { font: 800 1.6rem "Bricolage Grotesque", "Figtree", sans-serif; color: var(--ambar); margin: 0 0 1.5rem; }
+  .logo-texto[hidden] { display: none; }
+
+  h1 {
+    font: 800 clamp(2.2rem, 9vw, 3rem)/1.02 "Bricolage Grotesque", "Figtree", sans-serif;
+    letter-spacing: -0.02em;
+    margin: 0 0 .75rem;
+  }
+  .intro { color: var(--suave); margin: 0 0 2rem; max-width: 34ch; }
+
+  .tela {
+    background: var(--tela);
+    border: 1px solid var(--borda);
+    border-radius: 22px;
+    padding: 1.75rem 1.5rem 1.5rem;
+    box-shadow: 0 0 0 6px #111, 0 30px 80px -30px rgba(255,199,0,.35);
+  }
+
+  label { display: block; font-weight: 600; margin-bottom: .4rem; }
+  .campo { margin-bottom: 1.25rem; }
+  .entrada { position: relative; }
+  input[type=text], input[type=password] {
+    width: 100%;
+    font: 500 1.05rem "Figtree", sans-serif;
+    color: var(--texto);
+    background: var(--noite);
+    border: 1.5px solid var(--borda);
+    border-radius: 12px;
+    padding: .85rem 1rem;
+  }
+  input:focus-visible { outline: none; border-color: var(--ambar); box-shadow: 0 0 0 3px rgba(255,199,0,.25); }
+  .com-botao input { padding-right: 5.5rem; }
+  .ver {
+    position: absolute; right: .4rem; top: 50%; transform: translateY(-50%);
+    background: none; border: 0; color: var(--suave);
+    font: 600 .9rem "Figtree", sans-serif; padding: .5rem .7rem; border-radius: 8px; cursor: pointer;
+  }
+  .ver:hover { color: var(--texto); }
+  .ver:focus-visible { outline: 2px solid var(--ambar); }
+  .dica { color: var(--suave); font-size: .88rem; margin: .4rem 0 0; }
+
+  .isca { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  button[type=submit] {
+    width: 100%; margin-top: .5rem;
+    font: 700 1.1rem "Figtree", sans-serif;
+    color: #000; background: var(--ambar);
+    border: 0; border-radius: 12px; padding: 1rem; cursor: pointer;
+  }
+  button[type=submit]:hover { background: #FFD633; }
+  button[type=submit]:focus-visible { outline: 3px solid var(--texto); outline-offset: 3px; }
+  button[type=submit]:disabled { opacity: .6; cursor: wait; }
+
+  .aviso { margin: 1rem 0 0; padding: .8rem 1rem; border-radius: 12px; font-weight: 500; }
+  .aviso[hidden] { display: none; }
+  .aviso.erro { background: rgba(255,138,138,.12); color: var(--erro); }
+
+  .pronto { text-align: left; }
+  .pronto[hidden] { display: none; }
+  .selo {
+    width: 3.2rem; height: 3.2rem; border-radius: 50%;
+    background: rgba(255,199,0,.15); color: var(--ok);
+    display: grid; place-items: center; font-size: 1.6rem; margin-bottom: 1rem;
+  }
+  .pronto h2 { font: 800 1.6rem/1.15 "Bricolage Grotesque", sans-serif; margin: 0 0 .5rem; }
+  .pronto p { color: var(--suave); margin: 0 0 1.25rem; }
+  .pronto ol { margin: 0; padding-left: 1.2rem; }
+  .pronto li { margin-bottom: .5rem; }
+  .pronto li strong { color: var(--ambar); font-weight: 600; }
+  .outro { background: none; border: 0; color: var(--suave); text-decoration: underline; font: inherit; margin-top: 1.25rem; cursor: pointer; padding: 0; }
+
+  .rodape { color: var(--suave); font-size: .85rem; text-align: center; margin-top: 1.5rem; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .tela { animation: liga .5s ease-out both; }
+    @keyframes liga { from { opacity: 0; transform: scaleY(.96); filter: brightness(1.6); } }
+  }
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="https://my.maxplayer.tv/images/logo-sm.png" alt="MaxPlayer"
+       onerror="this.remove(); document.getElementById('logo-texto').hidden = false;">
+  <p class="logo-texto" id="logo-texto" hidden>MaxPlayer</p>
+  <h1>Ative seu MaxPlayer</h1>
+  <p class="intro">Use o mesmo login e senha da sua assinatura. Em segundos o app fica liberado.</p>
+
+  <div class="tela">
+    <form id="form" novalidate>
+      <div class="campo">
+        <label for="usuario">Login</label>
+        <input id="usuario" name="usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </div>
+      <div class="campo">
+        <label for="senha">Senha</label>
+        <div class="entrada com-botao">
+          <input id="senha" name="senha" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required>
+          <button type="button" class="ver" id="ver" aria-controls="senha" aria-pressed="false">Mostrar</button>
+        </div>
+        <p class="dica">Maiúsculas e minúsculas fazem diferença.</p>
+      </div>
+      <div class="isca" aria-hidden="true">
+        <label for="site">Não preencha</label>
+        <input id="site" name="site" type="text" tabindex="-1" autocomplete="off">
+      </div>
+      <button type="submit" id="enviar">Ativar meu app</button>
+      <p class="aviso erro" id="erro" role="alert" hidden></p>
+    </form>
+
+    <div class="pronto" id="pronto" hidden tabindex="-1">
+      <div class="selo" aria-hidden="true">✓</div>
+      <h2 id="pronto-titulo">App ativado</h2>
+      <p id="pronto-msg"></p>
+      <ol>
+        <li>Abra o <strong>MaxPlayer</strong> na TV ou no celular.</li>
+        <li>Entre com o mesmo login e senha que você digitou aqui.</li>
+        <li>Suas listas aparecem automaticamente.</li>
+      </ol>
+      <button class="outro" id="outro" type="button">Ativar outro login</button>
+    </div>
+  </div>
+
+  <p class="rodape">Problemas para ativar? Fale com quem vendeu sua assinatura.</p>
+</main>
+
+<script>
+  const form = document.getElementById('form');
+  const enviar = document.getElementById('enviar');
+  const erro = document.getElementById('erro');
+  const pronto = document.getElementById('pronto');
+  const senha = document.getElementById('senha');
+  const ver = document.getElementById('ver');
+
+  ver.addEventListener('click', () => {
+    const mostrar = senha.type === 'password';
+    senha.type = mostrar ? 'text' : 'password';
+    ver.textContent = mostrar ? 'Ocultar' : 'Mostrar';
+    ver.setAttribute('aria-pressed', String(mostrar));
+  });
+
+  function mostrarErro(msg) { erro.textContent = msg; erro.hidden = false; }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    erro.hidden = true;
+    const usuario = form.usuario.value.trim();
+    const pass = form.senha.value.trim();
+    if (!usuario || !pass) return mostrarErro('Preencha o login e a senha.');
+
+    enviar.disabled = true;
+    enviar.textContent = 'Ativando…';
+    try {
+      const r = await fetch('/api/ativar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario, senha: pass, site: form.site.value }),
+      });
+      const dados = await r.json().catch(() => ({}));
+      if (dados.ok) {
+        document.getElementById('pronto-msg').textContent = dados.mensagem || 'Pronto! Seu app foi ativado.';
+        form.hidden = true;
+        pronto.hidden = false;
+        pronto.focus();
+      } else {
+        mostrarErro(dados.mensagem || 'A ativação falhou. Tente de novo.');
+      }
+    } catch {
+      mostrarErro('Sem conexão. Verifique sua internet e tente de novo.');
+    } finally {
+      enviar.disabled = false;
+      enviar.textContent = 'Ativar meu app';
+    }
+  });
+
+  document.getElementById('outro').addEventListener('click', () => {
+    form.reset();
+    senha.type = 'password'; ver.textContent = 'Mostrar';
+    pronto.hidden = true; form.hidden = false;
+    form.usuario.focus();
+  });
+</script>
+</body>
+</html>
