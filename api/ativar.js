@@ -7,7 +7,9 @@ const API = 'https://api.maxplayer.tv/v3/api/public';
 const { MAXPLAYER_TOKEN, MAXPLAYER_DOMAIN_ID, MAX_DEVICES, SIGMA_TOKEN } = process.env;
 const SIGMA_URL = (process.env.SIGMA_URL || 'https://sistema.ftspanel.vip/api/integration/v1').replace(/\/+$/, '');
 
-// Revendedores autorizados (ID da Sigma ou usuário do revendedor), separados por vírgula
+// Revendedores autorizados (ID da Sigma ou usuário do revendedor), separados por vírgula.
+// Valor "1" = não confere nada (nem login no Xtream, nem Sigma): cria direto no MaxPlayer.
+const LIBERAR_TODOS = (process.env.SIGMA_REVENDAS_PERMITIDAS || '').trim() === '1';
 const REVENDAS_PERMITIDAS = new Set(
   (process.env.SIGMA_REVENDAS_PERMITIDAS || '')
     .split(',')
@@ -87,8 +89,15 @@ async function validarNoServidor(usuario, senha) {
   let info;
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    info = (await r.json())?.user_info;
-  } catch {
+    const texto = await r.text();
+    try {
+      info = JSON.parse(texto)?.user_info;
+    } catch {
+      console.error('Xtream respondeu sem JSON', r.status, base, texto.slice(0, 120));
+      return { ok: false, motivo: 'offline' };
+    }
+  } catch (e) {
+    console.error('Xtream inacessível', base, e.cause?.code || e.name, e.message);
     return { ok: false, motivo: 'offline' };
   }
   if (!info || Number(info.auth) !== 1) return { ok: false, motivo: 'invalido' };
@@ -137,92 +146,4 @@ async function revendaPermitida(usuario) {
     return { ok: false, motivo: 'sem_revenda' };
   }
   return { ok: true, revenda: cliente.reseller, revendaId: cliente.user_id };
-}
-
-// Procura o usuário exato no MaxPlayer (a busca é por "contém", então comparamos o nome inteiro)
-async function jaExiste(usuario) {
-  let cursor = '';
-  for (let pagina = 0; pagina < 5; pagina++) {
-    const qs = cursor ? `?limit=100&after_id=${cursor}` : '?limit=100';
-    const { status, dados } = await maxplayer('/users/search' + qs, {
-      method: 'POST',
-      body: JSON.stringify({ username: usuario }),
-    });
-    if (status !== 200 || !dados) throw new Error(`busca falhou (${status})`);
-    const lista = dados.users || [];
-    if (lista.some((u) => (u.username || '').toLowerCase() === usuario.toLowerCase())) return true;
-    if (!dados.has_more || !dados.next_cursor) return false;
-    cursor = dados.next_cursor;
-  }
-  return false;
-}
-
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return responder(res, 405, false, 'Método não permitido.');
-
-  if (!MAXPLAYER_TOKEN || !MAXPLAYER_DOMAIN_ID || !SIGMA_TOKEN || REVENDAS_PERMITIDAS.size === 0) {
-    console.error('Variáveis de ambiente faltando');
-    return responder(res, 500, false, 'Ativação indisponível no momento. Fale com o suporte.');
-  }
-
-  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'sem-ip';
-  if (bloqueado(ip)) {
-    return responder(res, 429, false, 'Muitas tentativas. Aguarde 10 minutos e tente de novo.');
-  }
-
-  let corpo = req.body;
-  if (typeof corpo === 'string') { try { corpo = JSON.parse(corpo); } catch { corpo = {}; } }
-  const { usuario: u, senha: s, site } = corpo || {};
-
-  // Campo invisível: robôs preenchem, pessoas não
-  if (site) return responder(res, 200, true, 'Recebido.');
-
-  const usuario = typeof u === 'string' ? u.trim() : '';
-  const senha = typeof s === 'string' ? s.trim() : '';
-  if (!usuario || !senha || usuario.length > 128 || senha.length > 128 || /\s/.test(usuario)) {
-    return responder(res, 400, false, 'Preencha o login e a senha exatamente como recebeu, sem espaços.');
-  }
-
-  // 1. Login existe e está ativo no servidor do domínio?
-  // 2. O revendedor do cliente (na Sigma) está na lista permitida?
-  let v = await validarNoServidor(usuario, senha);
-  if (v.ok) v = await revendaPermitida(usuario);
-  if (!v.ok) {
-    const msgs = {
-      invalido: 'Login ou senha não conferem. Confira as letras maiúsculas e minúsculas.',
-      inativo: 'Esse acesso está bloqueado. Fale com quem vendeu sua assinatura.',
-      vencido: 'Essa assinatura venceu. Renove para ativar o app.',
-      trial: 'Acessos de teste não podem ativar o app. Assine um plano para liberar.',
-      sem_revenda: 'Esse login não pode ser ativado por aqui. Fale com quem vendeu sua assinatura.',
-      offline: 'Não conseguimos conferir seu login agora. Tente de novo em alguns minutos.',
-    };
-    return responder(res, v.motivo === 'offline' ? 503 : 400, false, msgs[v.motivo]);
-  }
-
-  try {
-    // 3. Já foi ativado antes?
-    if (await jaExiste(usuario)) {
-      return responder(res, 200, true, 'Esse login já está ativado. É só abrir o MaxPlayer e entrar.');
-    }
-
-    // 4. Cria o cliente (login e senha do app = login e senha do servidor)
-    const payload = { domain_id: MAXPLAYER_DOMAIN_ID, iptv_user: usuario, iptv_pass: senha };
-    const telas = parseInt(MAX_DEVICES, 10);
-    if (telas > 0) payload.max_devices = telas;
-
-    const { status, dados } = await maxplayer('/users', { method: 'POST', body: JSON.stringify(payload) });
-
-    if (status === 200 && dados?.success === 1) {
-      console.log('Ativado:', usuario, 'id', dados.user_id, 'revenda', v.revendaId, v.revenda);
-      return responder(res, 200, true, 'Pronto! Seu app foi ativado.');
-    }
-
-    console.error('MaxPlayer recusou', status, dados?.error);
-    if (status === 429) return responder(res, 503, false, 'Muitas ativações agora. Tente em 1 minuto.');
-    if (status === 409) return responder(res, 409, false, 'Não foi possível ativar esse login automaticamente. Fale com o suporte.');
-    return responder(res, 502, false, 'A ativação falhou. Tente de novo ou fale com o suporte.');
-  } catch (e) {
-    console.error('Erro na ativação:', e.message);
-    return responder(res, 503, false, 'Não conseguimos falar com o MaxPlayer agora. Tente em alguns minutos.');
-  }
 }
